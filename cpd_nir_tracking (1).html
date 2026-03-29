@@ -1,0 +1,1451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CPD-NIR Document Tracking System</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet" />
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bp-blue: #003087;
+  --bp-blue-mid: #1351A8;
+  --bp-blue-hover: #0d3d8a;
+  --bp-blue-light: #E8EEF9;
+  --bp-blue-lighter: #f0f4fc;
+  --bp-red: #CE1126;
+  --bp-red-light: #FDEAEC;
+  --bp-gold: #FDC300;
+  --bp-gold-light: #FFF8DC;
+  --bp-gold-dark: #9a7500;
+  --bp-white: #FFFFFF;
+  --bp-surface: #F4F6FB;
+  --bp-border: rgba(0,48,135,0.11);
+  --bp-border-strong: rgba(0,48,135,0.22);
+  --bp-text: #0B1437;
+  --bp-muted: #6B7A99;
+  --bp-muted-light: #a0aec0;
+  --font: 'Plus Jakarta Sans', sans-serif;
+  --radius: 14px;
+  --radius-sm: 9px;
+  --radius-xs: 6px;
+  --sidebar-w: 248px;
+  --navbar-h: 62px;
+  --transition: all 0.18s cubic-bezier(0.4,0,0.2,1);
+  --sidebar-transition: all 0.26s cubic-bezier(0.4,0,0.2,1);
+}
+
+/* ─── COLLAPSED SIDEBAR STATE ─── */
+.app.sidebar-collapsed {
+  grid-template-columns: 62px 1fr;
+}
+.app.sidebar-collapsed .sidebar {
+  width: 62px;
+  overflow: hidden;
+}
+.app.sidebar-collapsed .sidebar-label,
+.app.sidebar-collapsed .nav-item span:not(.nav-icon),
+.app.sidebar-collapsed .nav-badge,
+.app.sidebar-collapsed .storage-bar-wrap,
+.app.sidebar-collapsed .brand-text,
+.app.sidebar-collapsed .qa-btn span:last-child {
+  opacity: 0;
+  pointer-events: none;
+  width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.app.sidebar-collapsed .brand-emblem {
+  margin: 0;
+}
+.app.sidebar-collapsed .nav-item {
+  justify-content: center;
+  padding: 9px 0;
+}
+.app.sidebar-collapsed .nav-item.active::before {
+  display: none;
+}
+.app.sidebar-collapsed .sidebar-section {
+  padding: 16px 8px 4px;
+}
+.app.sidebar-collapsed .quick-actions {
+  grid-template-columns: 1fr;
+}
+.app.sidebar-collapsed .qa-btn {
+  padding: 10px;
+  flex-direction: column;
+  gap: 0;
+}
+.app.sidebar-collapsed .sidebar-footer {
+  padding: 14px 8px;
+}
+.app.sidebar-collapsed .nav-item .nav-icon {
+  width: auto;
+}
+.app.sidebar-collapsed .nav-item:hover::after {
+  content: attr(data-label);
+  position: absolute;
+  left: 70px;
+  background: var(--bp-blue);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+  z-index: 999;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0,48,135,0.2);
+}
+
+/* Toggle button */
+.sidebar-toggle-btn {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.1);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  color: rgba(255,255,255,0.9);
+  font-size: 18px;
+  transition: var(--transition);
+  flex-shrink: 0;
+  user-select: none;
+  margin-left: 12px;
+}
+.sidebar-toggle-btn:hover {
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+}
+.toggle-icon { transition: transform 0.26s cubic-bezier(0.4,0,0.2,1); display: block; line-height: 1; }
+.app.sidebar-collapsed .toggle-icon { transform: scaleX(-1); }
+
+html, body {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  font-family: var(--font);
+  background: var(--bp-surface);
+  color: var(--bp-text);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ─── LAYOUT SHELL ─── */
+.app {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  grid-template-rows: var(--navbar-h) 1fr;
+  height: 100vh;
+  width: 100vw;
+  transition: grid-template-columns 0.26s cubic-bezier(0.4,0,0.2,1);
+}
+
+/* ─── NAVBAR ─── */
+.navbar {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  background: var(--bp-blue);
+  display: flex;
+  align-items: center;
+  padding: 0 24px 0 0;
+  z-index: 50;
+  position: relative;
+}
+.navbar::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--bp-gold) 0%, var(--bp-red) 40%, transparent 100%);
+}
+.nav-brand {
+  width: var(--sidebar-w);
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 0 20px;
+  height: 100%;
+  border-right: 1px solid rgba(255,255,255,0.1);
+  flex-shrink: 0;
+  transition: width 0.26s cubic-bezier(0.4,0,0.2,1), padding 0.26s ease;
+  overflow: hidden;
+}
+.app.sidebar-collapsed .nav-brand {
+  width: 62px;
+  padding: 0 12px;
+  justify-content: center;
+}
+.brand-emblem {
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  background: var(--bp-gold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 12px;
+  color: var(--bp-blue);
+  letter-spacing: -0.5px;
+  flex-shrink: 0;
+}
+.brand-text strong {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  transition: opacity 0.2s ease;
+}
+.brand-text span {
+  font-size: 10.5px;
+  color: rgba(255,255,255,0.55);
+  font-weight: 400;
+  white-space: nowrap;
+  transition: opacity 0.2s ease;
+}
+
+.nav-center {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+}
+.nav-search {
+  position: relative;
+  width: 340px;
+}
+.nav-search input {
+  width: 100%;
+  padding: 8px 12px 8px 36px;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 8px;
+  color: #fff;
+  font-family: var(--font);
+  font-size: 13px;
+  outline: none;
+  transition: var(--transition);
+}
+.nav-search input::placeholder { color: rgba(255,255,255,0.45); }
+.nav-search input:focus { background: rgba(255,255,255,0.16); border-color: rgba(255,255,255,0.35); }
+.nav-search-icon {
+  position: absolute;
+  left: 11px; top: 50%;
+  transform: translateY(-50%);
+  font-size: 14px;
+  color: rgba(255,255,255,0.5);
+  pointer-events: none;
+}
+
+.nav-date {
+  margin-left: 18px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.5);
+  white-space: nowrap;
+}
+
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.nav-icon-btn {
+  width: 36px; height: 36px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.08);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  color: rgba(255,255,255,0.8);
+  position: relative;
+  transition: var(--transition);
+}
+.nav-icon-btn:hover { background: rgba(255,255,255,0.16); }
+.notif-pip {
+  position: absolute;
+  top: 7px; right: 7px;
+  width: 7px; height: 7px;
+  background: var(--bp-red);
+  border-radius: 50%;
+  border: 2px solid var(--bp-blue);
+}
+.nav-divider {
+  width: 1px;
+  height: 26px;
+  background: rgba(255,255,255,0.15);
+  margin: 0 4px;
+}
+.nav-user {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 12px 5px 7px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.08);
+  cursor: pointer;
+  transition: var(--transition);
+}
+.nav-user:hover { background: rgba(255,255,255,0.15); }
+.nav-avatar {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--bp-red);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: #fff;
+  flex-shrink: 0;
+}
+.nav-user-info strong { display: block; font-size: 12px; font-weight: 700; color: #fff; line-height: 1.2; }
+.nav-user-info span { font-size: 10px; color: rgba(255,255,255,0.5); }
+
+/* ─── SIDEBAR ─── */
+.sidebar {
+  grid-column: 1;
+  grid-row: 2;
+  background: #fff;
+  border-right: 1px solid var(--bp-border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  transition: width 0.26s cubic-bezier(0.4,0,0.2,1);
+  width: var(--sidebar-w);
+}
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--bp-border-strong); border-radius: 2px; }
+
+.sidebar-section { padding: 16px 14px 4px; }
+.sidebar-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--bp-muted-light);
+  padding: 0 8px 8px;
+  display: block;
+  transition: opacity 0.2s ease, width 0.26s ease;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--bp-muted);
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 1px;
+  text-decoration: none;
+  position: relative;
+  transition: var(--transition);
+  user-select: none;
+}
+.nav-item:hover { background: var(--bp-blue-light); color: var(--bp-blue); }
+.nav-item.active {
+  background: var(--bp-blue-light);
+  color: var(--bp-blue);
+}
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 6px; bottom: 6px;
+  width: 3px;
+  background: var(--bp-blue);
+  border-radius: 0 2px 2px 0;
+}
+.nav-icon { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
+.nav-badge {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 20px;
+}
+.badge-blue { background: var(--bp-blue-light); color: var(--bp-blue); }
+.badge-red-pill { background: var(--bp-red-light); color: var(--bp-red); }
+.badge-gold-pill { background: var(--bp-gold-light); color: var(--bp-gold-dark); }
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 14px;
+  border-top: 1px solid var(--bp-border);
+}
+.storage-bar-wrap { margin-bottom: 14px; }
+.storage-bar-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--bp-muted); margin-bottom: 6px; }
+.storage-bar-label strong { color: var(--bp-text); font-weight: 700; }
+.storage-track { height: 5px; background: var(--bp-surface); border-radius: 3px; overflow: hidden; }
+.storage-fill { height: 100%; width: 62%; background: var(--bp-blue); border-radius: 3px; }
+
+.quick-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.qa-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 10px 8px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--bp-border);
+  background: #fff;
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--bp-muted);
+  transition: var(--transition);
+  text-align: center;
+}
+.qa-btn:hover { background: var(--bp-blue-light); color: var(--bp-blue); border-color: var(--bp-blue); }
+.qa-btn span { font-size: 18px; }
+
+/* ─── MAIN CONTENT AREA ─── */
+.main {
+  grid-column: 2;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bp-surface);
+}
+
+/* ─── CONTENT TOPBAR ─── */
+.content-topbar {
+  background: #fff;
+  border-bottom: 1px solid var(--bp-border);
+  padding: 0 28px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+}
+.breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.breadcrumb a { color: var(--bp-muted); text-decoration: none; font-weight: 500; }
+.breadcrumb a:hover { color: var(--bp-blue); }
+.breadcrumb-sep { color: var(--bp-muted-light); font-size: 12px; }
+.breadcrumb-current { font-weight: 700; color: var(--bp-blue); }
+
+.topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+.btn-primary { background: var(--bp-blue); color: #fff; }
+.btn-primary:hover { background: var(--bp-blue-hover); }
+.btn-gold { background: var(--bp-gold); color: var(--bp-blue); }
+.btn-gold:hover { background: #e8b200; }
+.btn-outline {
+  background: #fff;
+  color: var(--bp-blue);
+  border: 1.5px solid var(--bp-border-strong);
+  font-weight: 600;
+}
+.btn-outline:hover { background: var(--bp-blue-light); }
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+
+/* ─── SCROLLABLE CONTENT ─── */
+.content-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 22px 28px 30px;
+}
+.content-scroll::-webkit-scrollbar { width: 5px; }
+.content-scroll::-webkit-scrollbar-thumb { background: var(--bp-border-strong); border-radius: 3px; }
+
+/* ─── STATS ─── */
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 22px; }
+.stat-card {
+  background: #fff;
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  border: 1px solid var(--bp-border);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition: var(--transition);
+  cursor: default;
+}
+.stat-card:hover { border-color: var(--bp-blue); transform: translateY(-1px); }
+.stat-icon {
+  width: 46px; height: 46px;
+  border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+.si-blue { background: var(--bp-blue-light); }
+.si-gold { background: var(--bp-gold-light); }
+.si-green { background: #e8f5e9; }
+.si-red { background: var(--bp-red-light); }
+.stat-num { font-size: 26px; font-weight: 800; color: var(--bp-text); line-height: 1; }
+.stat-lbl { font-size: 11.5px; color: var(--bp-muted); margin-top: 3px; font-weight: 500; }
+.stat-delta { font-size: 11px; font-weight: 700; margin-top: 5px; }
+.delta-up { color: #2e7d32; }
+.delta-warn { color: var(--bp-gold-dark); }
+.delta-red { color: var(--bp-red); }
+
+/* ─── TOOLBAR ─── */
+.toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.tab-pills { display: flex; gap: 4px; background: #fff; border: 1px solid var(--bp-border); border-radius: 10px; padding: 4px; }
+.tab-pill {
+  padding: 6px 16px;
+  border-radius: 7px;
+  font-family: var(--font);
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--bp-muted);
+  border: none;
+  background: none;
+  transition: var(--transition);
+}
+.tab-pill.active { background: var(--bp-blue); color: #fff; }
+.tab-pill:hover:not(.active) { background: var(--bp-blue-light); color: var(--bp-blue); }
+
+.search-box {
+  position: relative;
+  flex: 1; min-width: 180px; max-width: 300px;
+}
+.search-box input {
+  width: 100%;
+  padding: 8px 12px 8px 34px;
+  border: 1.5px solid var(--bp-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font);
+  font-size: 12.5px;
+  color: var(--bp-text);
+  background: #fff;
+  outline: none;
+  transition: var(--transition);
+}
+.search-box input:focus { border-color: var(--bp-blue-mid); }
+.search-box-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 14px; color: var(--bp-muted); pointer-events: none; }
+.filter-sel {
+  padding: 7px 11px;
+  border: 1.5px solid var(--bp-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font);
+  font-size: 12.5px;
+  color: var(--bp-text);
+  background: #fff;
+  outline: none;
+  cursor: pointer;
+  font-weight: 600;
+}
+.toolbar-spacer { flex: 1; }
+.view-toggle { display: flex; border: 1.5px solid var(--bp-border); border-radius: var(--radius-sm); overflow: hidden; }
+.view-btn {
+  padding: 6px 11px;
+  background: #fff; border: none;
+  cursor: pointer; font-size: 14px;
+  color: var(--bp-muted);
+  transition: var(--transition);
+}
+.view-btn.active { background: var(--bp-blue); color: #fff; }
+
+/* ─── SECTION HEADERS ─── */
+.section-hdr { display: flex; align-items: center; gap: 9px; margin-bottom: 10px; margin-top: 6px; }
+.sh-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.sh-label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.9px; }
+.sh-count { font-size: 10.5px; font-weight: 800; padding: 2px 8px; border-radius: 20px; }
+.sh-line { flex: 1; height: 1px; background: var(--bp-border); }
+
+.s-revision .sh-dot { background: var(--bp-gold); }
+.s-revision .sh-label { color: var(--bp-gold-dark); }
+.s-revision .sh-count { background: var(--bp-gold-light); color: var(--bp-gold-dark); }
+
+.s-review .sh-dot { background: var(--bp-blue-mid); }
+.s-review .sh-label { color: var(--bp-blue); }
+.s-review .sh-count { background: var(--bp-blue-light); color: var(--bp-blue); }
+
+.s-approved .sh-dot { background: #4caf50; }
+.s-approved .sh-label { color: #1b5e20; }
+.s-approved .sh-count { background: #e8f5e9; color: #2e7d32; }
+
+.s-rejected .sh-dot { background: var(--bp-red); }
+.s-rejected .sh-label { color: var(--bp-red); }
+.s-rejected .sh-count { background: var(--bp-red-light); color: var(--bp-red); }
+
+/* ─── DOCUMENT TABLE ─── */
+.doc-table {
+  background: #fff;
+  border: 1px solid var(--bp-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+.dt-header {
+  display: grid;
+  grid-template-columns: 24px 170px 1fr 160px 140px 110px 80px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--bp-border);
+  background: var(--bp-surface);
+  gap: 10px;
+}
+.dt-col { font-size: 10.5px; font-weight: 800; color: var(--bp-muted); text-transform: uppercase; letter-spacing: 0.6px; }
+.dt-row {
+  display: grid;
+  grid-template-columns: 24px 170px 1fr 160px 140px 110px 80px;
+  padding: 13px 20px;
+  border-bottom: 1px solid var(--bp-border);
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.dt-row:last-child { border-bottom: none; }
+.dt-row:hover { background: var(--bp-blue-lighter); }
+
+.row-check {
+  width: 16px; height: 16px;
+  border: 1.5px solid var(--bp-border-strong);
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  accent-color: var(--bp-blue);
+  flex-shrink: 0;
+}
+.tracking-no {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--bp-blue-mid);
+  font-family: 'Courier New', monospace;
+  line-height: 1.4;
+  letter-spacing: -0.3px;
+}
+.doc-cell { display: flex; align-items: center; gap: 11px; }
+.doc-file-ico {
+  width: 36px; height: 36px;
+  border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px;
+  flex-shrink: 0;
+  background: var(--bp-red-light);
+}
+.doc-cell-name { font-size: 13px; font-weight: 700; color: var(--bp-text); }
+.doc-cell-sub { font-size: 11px; color: var(--bp-muted); margin-top: 2px; }
+.doc-cell-tags { display: flex; gap: 4px; margin-top: 4px; }
+
+.tag-pill { font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 20px; }
+.tag-high { background: var(--bp-red-light); color: var(--bp-red); }
+.tag-med { background: var(--bp-gold-light); color: var(--bp-gold-dark); }
+.tag-low { background: #e8f5e9; color: #2e7d32; }
+.tag-normal { background: var(--bp-blue-light); color: var(--bp-blue); }
+
+.to-cell { font-size: 12px; }
+.to-cell strong { display: block; font-weight: 700; color: var(--bp-text); }
+.to-cell span { font-size: 11px; color: var(--bp-muted); }
+
+.date-cell { font-size: 12px; color: var(--bp-muted); }
+.date-cell strong { display: block; font-weight: 600; color: var(--bp-text); font-size: 12px; }
+.date-cell em { font-size: 10.5px; font-style: normal; color: var(--bp-muted-light); }
+
+/* Status badge */
+.status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; border-radius: 20px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+.sb-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.sb-revision { background: var(--bp-gold-light); color: var(--bp-gold-dark); }
+.sb-review { background: var(--bp-blue-light); color: var(--bp-blue); }
+.sb-approved { background: #e8f5e9; color: #2e7d32; }
+.sb-rejected { background: var(--bp-red-light); color: var(--bp-red); }
+
+.row-actions { display: flex; gap: 5px; }
+.ra-btn {
+  width: 30px; height: 30px;
+  border-radius: 6px;
+  border: 1.5px solid var(--bp-border);
+  background: #fff;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--bp-muted);
+  transition: var(--transition);
+}
+.ra-btn:hover { background: var(--bp-blue-light); color: var(--bp-blue); border-color: var(--bp-blue); }
+.ra-btn.ra-del:hover { background: var(--bp-red-light); color: var(--bp-red); border-color: var(--bp-red); }
+
+/* ─── SIDE PANEL ─── */
+.panel-backdrop {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(11,20,55,0.3);
+  z-index: 200;
+  backdrop-filter: blur(2px);
+}
+.panel-backdrop.open { display: block; }
+.side-panel {
+  position: fixed;
+  right: 0; top: 0; bottom: 0;
+  width: 420px;
+  background: #fff;
+  box-shadow: -6px 0 32px rgba(0,48,135,0.13);
+  z-index: 201;
+  display: flex; flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.26s cubic-bezier(0.4,0,0.2,1);
+}
+.side-panel.open { transform: translateX(0); }
+.sp-head {
+  padding: 0;
+  background: var(--bp-blue);
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+.sp-head::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--bp-gold), var(--bp-red)); }
+.sp-head-inner { padding: 20px 22px 22px; }
+.sp-track { font-size: 10.5px; font-weight: 700; color: rgba(255,255,255,0.55); font-family: monospace; margin-bottom: 4px; }
+.sp-title { font-size: 18px; font-weight: 800; color: #fff; margin-bottom: 8px; }
+.sp-close {
+  position: absolute;
+  top: 14px; right: 14px;
+  width: 30px; height: 30px;
+  background: rgba(255,255,255,0.15);
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.sp-body { flex: 1; overflow-y: auto; padding: 22px; }
+.sp-body::-webkit-scrollbar { width: 4px; }
+.sp-body::-webkit-scrollbar-thumb { background: var(--bp-border-strong); border-radius: 2px; }
+
+.sp-sect-label { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; color: var(--bp-muted); margin-bottom: 12px; display: block; }
+.meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 22px; }
+.meta-box { background: var(--bp-surface); border-radius: var(--radius-sm); padding: 11px 14px; }
+.meta-box label { font-size: 10px; font-weight: 800; color: var(--bp-muted-light); text-transform: uppercase; letter-spacing: 0.7px; display: block; margin-bottom: 3px; }
+.meta-box span { font-size: 13px; font-weight: 700; color: var(--bp-text); }
+
+.timeline { position: relative; padding-left: 26px; }
+.timeline::before { content: ''; position: absolute; left: 9px; top: 10px; bottom: 10px; width: 2px; background: var(--bp-border); }
+.tl-item { position: relative; margin-bottom: 18px; }
+.tl-dot {
+  position: absolute;
+  left: -19px; top: 4px;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  border: 2.5px solid #fff;
+  box-shadow: 0 0 0 2px var(--bp-border);
+}
+.tl-dot.d-blue { background: var(--bp-blue); box-shadow: 0 0 0 2px rgba(19,81,168,0.2); }
+.tl-dot.d-gold { background: var(--bp-gold); box-shadow: 0 0 0 2px rgba(253,195,0,0.3); }
+.tl-dot.d-green { background: #4caf50; box-shadow: 0 0 0 2px rgba(76,175,80,0.2); }
+.tl-dot.d-red { background: var(--bp-red); box-shadow: 0 0 0 2px rgba(206,17,38,0.2); }
+.tl-dot.d-gray { background: var(--bp-muted); box-shadow: 0 0 0 2px rgba(107,122,153,0.2); }
+.tl-action { font-size: 13px; font-weight: 700; color: var(--bp-text); }
+.tl-meta { font-size: 11px; color: var(--bp-muted); margin-top: 2px; }
+.tl-note { font-size: 12px; color: var(--bp-text); background: var(--bp-surface); border-left: 3px solid var(--bp-blue); padding: 9px 12px; border-radius: 0 8px 8px 0; margin-top: 8px; line-height: 1.5; }
+
+.sp-footer {
+  padding: 14px 22px;
+  border-top: 1px solid var(--bp-border);
+  display: flex; gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ─── UPLOAD MODAL ─── */
+.modal-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(11,20,55,0.45);
+  z-index: 300;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(3px);
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: #fff;
+  border-radius: 18px;
+  width: 520px;
+  max-width: 96vw;
+  max-height: 92vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,48,135,0.2);
+}
+.modal-head {
+  padding: 24px 28px 0;
+  border-bottom: 1px solid var(--bp-border);
+  padding-bottom: 18px;
+}
+.modal-head h2 { font-size: 18px; font-weight: 800; color: var(--bp-blue); }
+.modal-head p { font-size: 13px; color: var(--bp-muted); margin-top: 3px; }
+.modal-body { padding: 22px 28px; }
+.drop-zone {
+  border: 2px dashed var(--bp-blue);
+  border-radius: 12px;
+  padding: 28px;
+  text-align: center;
+  background: var(--bp-blue-light);
+  cursor: pointer;
+  margin-bottom: 20px;
+  transition: var(--transition);
+}
+.drop-zone:hover { background: var(--bp-blue-lighter); }
+.dz-icon { font-size: 34px; margin-bottom: 8px; }
+.dz-title { font-size: 14px; font-weight: 700; color: var(--bp-blue); }
+.dz-sub { font-size: 11.5px; color: var(--bp-muted); margin-top: 3px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+.form-grp { display: flex; flex-direction: column; gap: 5px; }
+.form-grp label { font-size: 12px; font-weight: 700; color: var(--bp-text); }
+.form-grp input, .form-grp select, .form-grp textarea {
+  padding: 9px 12px;
+  border: 1.5px solid var(--bp-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--bp-text);
+  outline: none;
+  background: #fff;
+  transition: var(--transition);
+}
+.form-grp input:focus, .form-grp select:focus, .form-grp textarea:focus { border-color: var(--bp-blue); }
+.form-grp textarea { resize: vertical; min-height: 70px; }
+.modal-foot {
+  padding: 16px 28px 24px;
+  border-top: 1px solid var(--bp-border);
+  display: flex; justify-content: flex-end; gap: 10px;
+}
+
+/* Notification panel */
+.notif-panel {
+  position: absolute;
+  top: 50px; right: 14px;
+  width: 320px;
+  background: #fff;
+  border: 1px solid var(--bp-border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 32px rgba(0,48,135,0.14);
+  z-index: 100;
+  display: none;
+}
+.notif-panel.open { display: block; }
+.np-head { padding: 14px 16px 10px; border-bottom: 1px solid var(--bp-border); display: flex; align-items: center; justify-content: space-between; }
+.np-head strong { font-size: 13px; font-weight: 800; color: var(--bp-text); }
+.np-head span { font-size: 11px; color: var(--bp-blue); cursor: pointer; font-weight: 700; }
+.notif-item { padding: 12px 16px; border-bottom: 1px solid var(--bp-border); display: flex; gap: 10px; cursor: pointer; transition: var(--transition); }
+.notif-item:hover { background: var(--bp-surface); }
+.notif-item:last-child { border-bottom: none; }
+.ni-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
+.ni-text strong { font-size: 12.5px; font-weight: 700; color: var(--bp-text); display: block; }
+.ni-text span { font-size: 11px; color: var(--bp-muted); }
+.ni-time { font-size: 10px; color: var(--bp-muted-light); margin-top: 3px; display: block; }
+
+/* Animations */
+@keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+.stat-card { animation: fadeIn 0.4s ease both; }
+.stat-card:nth-child(2) { animation-delay: 0.05s; }
+.stat-card:nth-child(3) { animation-delay: 0.1s; }
+.stat-card:nth-child(4) { animation-delay: 0.15s; }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ─── NAVBAR ─── -->
+  <header class="navbar">
+    <div class="nav-brand">
+      <div class="brand-emblem">CPD</div>
+      <div class="brand-text">
+        <strong>CPD-NIR</strong>
+        <span>Document Tracking System</span>
+      </div>
+    </div>
+    <div class="sidebar-toggle-btn" onclick="toggleSidebar()" title="Toggle sidebar">
+      <span class="toggle-icon">☰</span>
+    </div>
+    <div class="nav-center">
+      <div class="nav-search">
+        <span class="nav-search-icon">🔍</span>
+        <input type="text" placeholder="Quick search documents, tracking numbers…" oninput="filterDocs(this.value)" />
+      </div>
+      <div class="nav-date" id="navDate"></div>
+    </div>
+    <div class="nav-right" style="position:relative;">
+      <div class="nav-icon-btn" title="Help">❓</div>
+      <div class="nav-icon-btn" title="Reports">📊</div>
+      <div class="nav-icon-btn" title="Notifications" onclick="toggleNotif(event)">
+        🔔<span class="notif-pip"></span>
+        <div class="notif-panel" id="notifPanel">
+          <div class="np-head"><strong>Notifications</strong><span>Mark all read</span></div>
+          <div class="notif-item">
+            <div class="ni-dot" style="background:var(--bp-gold);"></div>
+            <div class="ni-text">
+              <strong>Document returned for revision</strong>
+              <span>test file — DTS-20260304-519493</span>
+              <em class="ni-time">14 days ago</em>
+            </div>
+          </div>
+          <div class="notif-item">
+            <div class="ni-dot" style="background:var(--bp-blue);"></div>
+            <div class="ni-text">
+              <strong>New document assigned to you</strong>
+              <span>Project Implementation Report</span>
+              <em class="ni-time">8 days ago</em>
+            </div>
+          </div>
+          <div class="notif-item">
+            <div class="ni-dot" style="background:#4caf50;"></div>
+            <div class="ni-text">
+              <strong>Document approved</strong>
+              <span>Annual Training Plan 2026</span>
+              <em class="ni-time">17 days ago</em>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-divider"></div>
+      <div class="nav-user">
+        <div class="nav-avatar">JD</div>
+        <div class="nav-user-info">
+          <strong>Juan Dela Cruz</strong>
+          <span>Document Officer</span>
+        </div>
+        <span style="color:rgba(255,255,255,0.4);font-size:12px;margin-left:2px;">▾</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ─── SIDEBAR ─── -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <span class="sidebar-label">Main</span>
+      <a class="nav-item" href="#" onclick="return false;" data-label="Dashboard">
+        <span class="nav-icon">⊞</span> Dashboard
+      </a>
+      <a class="nav-item active" href="#" onclick="return false;" data-label="My Documents">
+        <span class="nav-icon">🗂</span> My Documents
+        <span class="nav-badge badge-gold-pill">4</span>
+      </a>
+      <a class="nav-item" href="#" onclick="return false;" data-label="All Documents">
+        <span class="nav-icon">📁</span> All Documents
+        <span class="nav-badge badge-blue">24</span>
+      </a>
+      <a class="nav-item" href="#" onclick="return false;" data-label="Shared Docs Log">
+        <span class="nav-icon">📤</span> Shared Docs Log
+      </a>
+    </div>
+
+    <div class="sidebar-section" style="margin-top:6px;">
+      <span class="sidebar-label">Workflow</span>
+      <a class="nav-item" href="#" onclick="return false;" data-label="Document Review">
+        <span class="nav-icon">✅</span> Document Review
+        <span class="nav-badge badge-red-pill">2</span>
+      </a>
+      <a class="nav-item" href="#" onclick="return false;" data-label="For Revision">
+        <span class="nav-icon">↩</span> For Revision
+        <span class="nav-badge badge-gold-pill">3</span>
+      </a>
+      <a class="nav-item" href="#" onclick="return false;" data-label="Incoming">
+        <span class="nav-icon">📬</span> Incoming
+        <span class="nav-badge badge-blue">7</span>
+      </a>
+      <a class="nav-item" href="#" onclick="return false;" data-label="Outgoing">
+        <span class="nav-icon">📨</span> Outgoing
+      </a>
+    </div>
+
+    <div class="sidebar-section" style="margin-top:6px;">
+      <span class="sidebar-label">Reports & Analytics</span>
+      <a class="nav-item" href="#" onclick="return false;" data-label="Analytics"><span class="nav-icon">📊</span> Analytics</a>
+      <a class="nav-item" href="#" onclick="return false;" data-label="Audit Log"><span class="nav-icon">📋</span> Audit Log</a>
+      <a class="nav-item" href="#" onclick="return false;" data-label="Reports"><span class="nav-icon">📑</span> Reports</a>
+    </div>
+
+    <div class="sidebar-section" style="margin-top:6px;">
+      <span class="sidebar-label">Administration</span>
+      <a class="nav-item" href="#" onclick="return false;" data-label="Users & Roles"><span class="nav-icon">👥</span> Users &amp; Roles</a>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="storage-bar-wrap">
+        <div class="storage-bar-label">
+          <span>Storage Used</span>
+          <strong>6.2 / 10 GB</strong>
+        </div>
+        <div class="storage-track"><div class="storage-fill"></div></div>
+      </div>
+      <div class="quick-actions">
+        <button class="qa-btn" onclick="openModal()"><span>⬆</span>Upload</button>
+        <button class="qa-btn"><span>📥</span>Receive</button>
+        <button class="qa-btn"><span>🔍</span>Track</button>
+        <button class="qa-btn"><span>📊</span>Report</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ─── MAIN ─── -->
+  <main class="main">
+    <!-- Content topbar / breadcrumb -->
+    <div class="content-topbar">
+      <div class="breadcrumb">
+        <a href="#">Home</a>
+        <span class="breadcrumb-sep">›</span>
+        <a href="#">My Documents</a>
+        <span class="breadcrumb-sep">›</span>
+        <span class="breadcrumb-current">Shared Files</span>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn btn-outline btn-sm">☑ Select Multiple</button>
+        <button class="btn btn-outline btn-sm">⤓ Export</button>
+        <button class="btn btn-outline btn-sm" onclick="openModal()">⬆ Upload Document</button>
+        <button class="btn btn-gold btn-sm">+ New Document</button>
+      </div>
+    </div>
+
+    <!-- Scrollable content -->
+    <div class="content-scroll">
+
+      <!-- Stats -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon si-blue">📂</div>
+          <div>
+            <div class="stat-num">24</div>
+            <div class="stat-lbl">Total Documents</div>
+            <div class="stat-delta delta-up">↑ 3 this week</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon si-gold">⏳</div>
+          <div>
+            <div class="stat-num">6</div>
+            <div class="stat-lbl">Pending Review</div>
+            <div class="stat-delta delta-warn">Needs attention</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon si-green">✅</div>
+          <div>
+            <div class="stat-num">15</div>
+            <div class="stat-lbl">Approved</div>
+            <div class="stat-delta delta-up">↑ 5 this month</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon si-red">↩</div>
+          <div>
+            <div class="stat-num">3</div>
+            <div class="stat-lbl">For Revision</div>
+            <div class="stat-delta delta-red">Action required</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Toolbar -->
+      <div class="toolbar-row">
+        <div class="tab-pills">
+          <button class="tab-pill active" onclick="setTab(this)">Shared Files</button>
+          <button class="tab-pill" onclick="setTab(this)">My Documents</button>
+          <button class="tab-pill" onclick="setTab(this)">Shared With Me</button>
+          <button class="tab-pill" onclick="setTab(this)">Archived</button>
+        </div>
+        <div class="search-box">
+          <span class="search-box-icon">🔍</span>
+          <input type="text" placeholder="Search documents…" oninput="filterDocs(this.value)" />
+        </div>
+        <select class="filter-sel" onchange="filterStatus(this.value)">
+          <option value="">All Status</option>
+          <option value="revision">For Revision</option>
+          <option value="review">In Review</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+        </select>
+        <select class="filter-sel">
+          <option>All Types</option>
+          <option>Memorandum</option>
+          <option>Letter</option>
+          <option>Report</option>
+          <option>Request</option>
+          <option>Resolution</option>
+        </select>
+        <select class="filter-sel">
+          <option>All Priority</option>
+          <option>Urgent</option>
+          <option>High</option>
+          <option>Medium</option>
+          <option>Normal</option>
+        </select>
+        <div class="toolbar-spacer"></div>
+        <div class="view-toggle">
+          <button class="view-btn active" title="List view">☰</button>
+          <button class="view-btn" title="Grid view">⊞</button>
+        </div>
+      </div>
+
+      <!-- SECTION: For Revision -->
+      <div id="sec-revision">
+        <div class="section-hdr s-revision">
+          <span class="sh-dot"></span>
+          <span class="sh-label">Returned for Revision</span>
+          <span class="sh-count">1</span>
+          <span class="sh-line"></span>
+        </div>
+        <div class="doc-table">
+          <div class="dt-header">
+            <div></div>
+            <div class="dt-col">Tracking No.</div>
+            <div class="dt-col">Document</div>
+            <div class="dt-col">Sent To</div>
+            <div class="dt-col">Date Filed</div>
+            <div class="dt-col">Status</div>
+            <div class="dt-col">Actions</div>
+          </div>
+          <div class="dt-row" onclick="openPanel('DTS-20260304-519493','test file','Memorandum','Admin User','CPD-NIR Office','Mar 04, 2026','14 days ago','revision')">
+            <input type="checkbox" class="row-check" onclick="event.stopPropagation()" />
+            <div class="tracking-no">DTS-20260304<br/>519493</div>
+            <div class="doc-cell">
+              <div class="doc-file-ico">📄</div>
+              <div>
+                <div class="doc-cell-name">test file</div>
+                <div class="doc-cell-sub">Memorandum · 2 pages · 1.2 MB</div>
+                <div class="doc-cell-tags">
+                  <span class="tag-pill tag-high">High Priority</span>
+                </div>
+              </div>
+            </div>
+            <div class="to-cell"><strong>Admin User</strong><span>CPD-NIR Office</span></div>
+            <div class="date-cell"><strong>Mar 04, 2026</strong><em>14 days ago</em></div>
+            <div><span class="status-badge sb-revision"><span class="sb-dot"></span>For Revision</span></div>
+            <div class="row-actions">
+              <div class="ra-btn" title="View">👁</div>
+              <div class="ra-btn" title="Download">⬇</div>
+              <div class="ra-btn ra-del" title="Delete" onclick="event.stopPropagation()">🗑</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION: In Review -->
+      <div id="sec-review">
+        <div class="section-hdr s-review">
+          <span class="sh-dot"></span>
+          <span class="sh-label">In Review</span>
+          <span class="sh-count">2</span>
+          <span class="sh-line"></span>
+        </div>
+        <div class="doc-table">
+          <div class="dt-header">
+            <div></div>
+            <div class="dt-col">Tracking No.</div>
+            <div class="dt-col">Document</div>
+            <div class="dt-col">Sent To</div>
+            <div class="dt-col">Date Filed</div>
+            <div class="dt-col">Status</div>
+            <div class="dt-col">Actions</div>
+          </div>
+          <div class="dt-row" onclick="openPanel('DTS-20260304-765691','Q1 Budget Proposal','Letter','Admin User','Finance Division','Mar 04, 2026','14 days ago','review')">
+            <input type="checkbox" class="row-check" onclick="event.stopPropagation()" />
+            <div class="tracking-no">DTS-20260304<br/>765691</div>
+            <div class="doc-cell">
+              <div class="doc-file-ico">📄</div>
+              <div>
+                <div class="doc-cell-name">Q1 Budget Proposal</div>
+                <div class="doc-cell-sub">Letter · 5 pages · 2.8 MB</div>
+                <div class="doc-cell-tags">
+                  <span class="tag-pill tag-med">Medium Priority</span>
+                </div>
+              </div>
+            </div>
+            <div class="to-cell"><strong>Admin User</strong><span>Finance Division</span></div>
+            <div class="date-cell"><strong>Mar 04, 2026</strong><em>14 days ago</em></div>
+            <div><span class="status-badge sb-review"><span class="sb-dot"></span>In Review</span></div>
+            <div class="row-actions">
+              <div class="ra-btn" title="View">👁</div>
+              <div class="ra-btn" title="Download">⬇</div>
+              <div class="ra-btn ra-del" title="Delete" onclick="event.stopPropagation()">🗑</div>
+            </div>
+          </div>
+          <div class="dt-row" onclick="openPanel('DTS-20260310-881234','Project Implementation Report','Report','Regional Director','Planning Office','Mar 10, 2026','8 days ago','review')">
+            <input type="checkbox" class="row-check" onclick="event.stopPropagation()" />
+            <div class="tracking-no">DTS-20260310<br/>881234</div>
+            <div class="doc-cell">
+              <div class="doc-file-ico" style="background:#e8f5e9;">📄</div>
+              <div>
+                <div class="doc-cell-name">Project Implementation Report</div>
+                <div class="doc-cell-sub">Report · 12 pages · 4.1 MB</div>
+                <div class="doc-cell-tags">
+                  <span class="tag-pill tag-normal">Normal Priority</span>
+                </div>
+              </div>
+            </div>
+            <div class="to-cell"><strong>Regional Director</strong><span>Planning Office</span></div>
+            <div class="date-cell"><strong>Mar 10, 2026</strong><em>8 days ago</em></div>
+            <div><span class="status-badge sb-review"><span class="sb-dot"></span>In Review</span></div>
+            <div class="row-actions">
+              <div class="ra-btn" title="View">👁</div>
+              <div class="ra-btn" title="Download">⬇</div>
+              <div class="ra-btn ra-del" title="Delete" onclick="event.stopPropagation()">🗑</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION: Approved -->
+      <div id="sec-approved">
+        <div class="section-hdr s-approved">
+          <span class="sh-dot"></span>
+          <span class="sh-label">Approved</span>
+          <span class="sh-count">1</span>
+          <span class="sh-line"></span>
+        </div>
+        <div class="doc-table">
+          <div class="dt-header">
+            <div></div>
+            <div class="dt-col">Tracking No.</div>
+            <div class="dt-col">Document</div>
+            <div class="dt-col">Sent To</div>
+            <div class="dt-col">Date Filed</div>
+            <div class="dt-col">Status</div>
+            <div class="dt-col">Actions</div>
+          </div>
+          <div class="dt-row" onclick="openPanel('DTS-20260301-441200','Annual Training Plan 2026','Memorandum','Regional Director','HR Division','Mar 01, 2026','17 days ago','approved')">
+            <input type="checkbox" class="row-check" onclick="event.stopPropagation()" />
+            <div class="tracking-no">DTS-20260301<br/>441200</div>
+            <div class="doc-cell">
+              <div class="doc-file-ico" style="background:#e8f5e9;">📄</div>
+              <div>
+                <div class="doc-cell-name">Annual Training Plan 2026</div>
+                <div class="doc-cell-sub">Memorandum · 8 pages · 3.5 MB</div>
+                <div class="doc-cell-tags">
+                  <span class="tag-pill tag-normal">Normal Priority</span>
+                </div>
+              </div>
+            </div>
+            <div class="to-cell"><strong>Regional Director</strong><span>HR Division</span></div>
+            <div class="date-cell"><strong>Mar 01, 2026</strong><em>17 days ago</em></div>
+            <div><span class="status-badge sb-approved"><span class="sb-dot"></span>Approved</span></div>
+            <div class="row-actions">
+              <div class="ra-btn" title="View">👁</div>
+              <div class="ra-btn" title="Download">⬇</div>
+              <div class="ra-btn ra-del" title="Delete" onclick="event.stopPropagation()">🗑</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content-scroll -->
+  </main>
+</div><!-- /app -->
+
+<!-- ─── SIDE PANEL ─── -->
+<div class="panel-backdrop" id="panelBackdrop" onclick="closePanel()"></div>
+<div class="side-panel" id="sidePanel">
+  <div class="sp-head">
+    <div class="sp-head-inner">
+      <button class="sp-close" onclick="closePanel()">✕</button>
+      <div class="sp-track" id="spTrack">DTS-20260304-519493</div>
+      <div class="sp-title" id="spTitle">test file</div>
+      <span class="status-badge sb-revision" id="spBadge"><span class="sb-dot"></span>For Revision</span>
+    </div>
+  </div>
+  <div class="sp-body">
+    <div class="meta-grid">
+      <div class="meta-box"><label>Document Type</label><span id="spType">Memorandum</span></div>
+      <div class="meta-box"><label>Submitted To</label><span id="spSent">Admin User</span></div>
+      <div class="meta-box"><label>Office / Division</label><span id="spOffice">CPD-NIR Office</span></div>
+      <div class="meta-box"><label>Date Filed</label><span id="spDate">Mar 04, 2026</span></div>
+      <div class="meta-box"><label>Days Elapsed</label><span id="spAge">14 days ago</span></div>
+      <div class="meta-box"><label>Current Status</label><span id="spStatus">For Revision</span></div>
+    </div>
+
+    <span class="sp-sect-label">Document Timeline</span>
+    <div class="timeline" id="spTimeline">
+      <!-- filled by JS -->
+    </div>
+  </div>
+  <div class="sp-footer">
+    <button class="btn btn-primary" style="flex:1;" id="spActionBtn">↩ Resubmit</button>
+    <button class="btn btn-outline">⬇ Download</button>
+    <button class="btn btn-outline" style="color:var(--bp-red);border-color:var(--bp-red);">🗑</button>
+  </div>
+</div>
+
+<!-- ─── UPLOAD MODAL ─── -->
+<div class="modal-overlay" id="uploadModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>⬆ Upload New Document</h2>
+      <p>Fill in the document details and attach your file for tracking.</p>
+    </div>
+    <div class="modal-body">
+      <div class="drop-zone" onclick="document.getElementById('fileInput').click()">
+        <div class="dz-icon">📎</div>
+        <div class="dz-title">Drag & drop your file here, or click to browse</div>
+        <div class="dz-sub">Supported: PDF, DOCX, XLSX — Max file size: 20 MB</div>
+        <input type="file" id="fileInput" style="display:none;" />
+      </div>
+      <div class="form-row">
+        <div class="form-grp">
+          <label>Document Title *</label>
+          <input type="text" placeholder="e.g. Budget Proposal Q2 2026" />
+        </div>
+        <div class="form-grp">
+          <label>Document Type *</label>
+          <select>
+            <option>Memorandum</option>
+            <option>Letter</option>
+            <option>Report</option>
+            <option>Request</option>
+            <option>Resolution</option>
+            <option>Endorsement</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-grp">
+          <label>Send To (Name / Office) *</label>
+          <input type="text" placeholder="e.g. Regional Director" />
+        </div>
+        <div class="form-grp">
+          <label>Priority Level</label>
+          <select>
+            <option>Normal</option>
+            <option>Medium</option>
+            <option>High</option>
+            <option>Urgent</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-grp">
+          <label>Document Date</label>
+          <input type="date" />
+        </div>
+        <div class="form-grp">
+          <label>Reference Number</label>
+          <input type="text" placeholder="Optional reference no." />
+        </div>
+      </div>
+      <div class="form-grp">
+        <label>Remarks / Instructions</label>
+        <textarea placeholder="Add notes or instructions for the reviewer…"></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary">Submit Document</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Date display
+const d = new Date();
+document.getElementById('navDate').textContent = d.toLocaleDateString('en-PH', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+function toggleSidebar() {
+  document.querySelector('.app').classList.toggle('sidebar-collapsed');
+}
+
+function setTab(el) {
+  document.querySelectorAll('.tab-pill').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function openModal() {
+  document.getElementById('uploadModal').classList.add('open');
+}
+function closeModal() {
+  document.getElementById('uploadModal').classList.remove('open');
+}
+document.getElementById('uploadModal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+function toggleNotif(e) {
+  e.stopPropagation();
+  document.getElementById('notifPanel').classList.toggle('open');
+}
+document.addEventListener('click', function() {
+  document.getElementById('notifPanel').classList.remove('open');
+});
+
+const timelines = {
+  revision: `
+    <div class="tl-item"><span class="tl-dot d-gold"></span><div class="tl-action">Returned for Revision</div><div class="tl-meta">Admin User · Mar 10, 2026 at 2:14 PM</div><div class="tl-note">Please revise the summary section and update the attached annexes before resubmission.</div></div>
+    <div class="tl-item"><span class="tl-dot d-blue"></span><div class="tl-action">Under Review</div><div class="tl-meta">Admin User · Mar 06, 2026 at 9:00 AM</div></div>
+    <div class="tl-item"><span class="tl-dot d-blue"></span><div class="tl-action">Forwarded to Admin User</div><div class="tl-meta">Juan Dela Cruz · Mar 05, 2026 at 3:45 PM</div></div>
+    <div class="tl-item"><span class="tl-dot d-gray"></span><div class="tl-action">Document Uploaded</div><div class="tl-meta">Juan Dela Cruz · Mar 04, 2026 at 11:30 AM</div></div>
+  `,
+  review: `
+    <div class="tl-item"><span class="tl-dot d-blue"></span><div class="tl-action">Under Review</div><div class="tl-meta">Admin User · Review in progress</div><div class="tl-note">Document is currently being evaluated by the assigned reviewer.</div></div>
+    <div class="tl-item"><span class="tl-dot d-blue"></span><div class="tl-action">Forwarded to Reviewer</div><div class="tl-meta">Juan Dela Cruz · Mar 05, 2026 at 10:15 AM</div></div>
+    <div class="tl-item"><span class="tl-dot d-gray"></span><div class="tl-action">Document Uploaded</div><div class="tl-meta">Juan Dela Cruz · Mar 04, 2026 at 8:00 AM</div></div>
+  `,
+  approved: `
+    <div class="tl-item"><span class="tl-dot d-green"></span><div class="tl-action">Document Approved</div><div class="tl-meta">Regional Director · Mar 15, 2026 at 4:00 PM</div><div class="tl-note">Approved with commendation. Training plan aligns with the regional priorities for 2026.</div></div>
+    <div class="tl-item"><span class="tl-dot d-blue"></span><div class="tl-action">Under Review</div><div class="tl-meta">Regional Director · Mar 05, 2026 at 11:00 AM</div></div>
+    <div class="tl-item"><span class="tl-dot d-blue"></span><div class="tl-action">Forwarded to Regional Director</div><div class="tl-meta">Juan Dela Cruz · Mar 02, 2026 at 9:30 AM</div></div>
+    <div class="tl-item"><span class="tl-dot d-gray"></span><div class="tl-action">Document Uploaded</div><div class="tl-meta">Juan Dela Cruz · Mar 01, 2026 at 8:45 AM</div></div>
+  `
+};
+
+const actionLabels = { revision: '↩ Resubmit', review: '👁 View Document', approved: '⬇ Download', rejected: '↩ Re-file' };
+const badgeClasses = { revision: 'sb-revision', review: 'sb-review', approved: 'sb-approved', rejected: 'sb-rejected' };
+const badgeLabels = { revision: 'For Revision', review: 'In Review', approved: 'Approved', rejected: 'Rejected' };
+
+function openPanel(tracking, name, type, sent, office, date, age, statusKey) {
+  document.getElementById('spTrack').textContent = tracking;
+  document.getElementById('spTitle').textContent = name;
+  document.getElementById('spType').textContent = type;
+  document.getElementById('spSent').textContent = sent;
+  document.getElementById('spOffice').textContent = office;
+  document.getElementById('spDate').textContent = date;
+  document.getElementById('spAge').textContent = age;
+  document.getElementById('spStatus').textContent = badgeLabels[statusKey];
+  const badge = document.getElementById('spBadge');
+  badge.className = 'status-badge ' + badgeClasses[statusKey];
+  badge.innerHTML = '<span class="sb-dot"></span>' + badgeLabels[statusKey];
+  document.getElementById('spTimeline').innerHTML = timelines[statusKey] || timelines.review;
+  document.getElementById('spActionBtn').textContent = actionLabels[statusKey];
+  document.getElementById('panelBackdrop').classList.add('open');
+  document.getElementById('sidePanel').classList.add('open');
+}
+function closePanel() {
+  document.getElementById('panelBackdrop').classList.remove('open');
+  document.getElementById('sidePanel').classList.remove('open');
+}
+
+function filterDocs(val) {
+  val = val.toLowerCase();
+  document.querySelectorAll('.dt-row').forEach(row => {
+    row.style.display = row.textContent.toLowerCase().includes(val) ? '' : 'none';
+  });
+}
+function filterStatus(val) {
+  const map = { revision: 'sec-revision', review: 'sec-review', approved: 'sec-approved', rejected: 'sec-rejected' };
+  if (!val) {
+    Object.values(map).forEach(id => { const el = document.getElementById(id); if(el) el.style.display = ''; });
+    return;
+  }
+  Object.entries(map).forEach(([k, id]) => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = (k === val) ? '' : 'none';
+  });
+}
+</script>
+</body>
+</html>
